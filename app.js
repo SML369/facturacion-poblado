@@ -20,32 +20,65 @@ document.getElementById('supaProject').textContent = new URL(SUPA_URL).hostname.
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 async function extractPdfText(arrayBuffer) {
+  // Las facturas DIAN son texto corrido normal: agrupar por linea (Y) funciona bien.
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   let fullText = '';
+  const TOL = 1.5;
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    const items = content.items;
-    const lineMap = new Map();
+    const items = content.items.filter(it => it.str && it.str.trim());
+    items.sort((a, b) => b.transform[5] - a.transform[5] || a.transform[4] - b.transform[4]);
+    const lines = [];
+    let current = [];
+    let currentY = null;
     for (const it of items) {
-      if (!it.str || !it.str.trim()) continue;
-      const yRaw = Math.round(it.transform[5]);
-      // agrupar lineas cuya coordenada Y esta a 2px o menos (variaciones de linea base)
-      let key = yRaw;
-      for (const existingY of lineMap.keys()) {
-        if (Math.abs(existingY - yRaw) <= 2) { key = existingY; break; }
+      const y = it.transform[5];
+      if (currentY === null || Math.abs(y - currentY) <= TOL) {
+        current.push(it);
+        if (currentY === null) currentY = y;
+      } else {
+        lines.push(current);
+        current = [it];
+        currentY = y;
       }
-      if (!lineMap.has(key)) lineMap.set(key, []);
-      lineMap.get(key).push(it);
     }
-    const ys = [...lineMap.keys()].sort((a, b) => b - a);
-    for (const y of ys) {
-      const lineItems = lineMap.get(y).sort((a, b) => a.transform[4] - b.transform[4]);
-      fullText += lineItems.map(i => i.str).join(' ') + '\n';
+    if (current.length) lines.push(current);
+    for (const line of lines) {
+      line.sort((a, b) => a.transform[4] - b.transform[4]);
+      fullText += line.map(i => i.str).join(' ') + '\n';
     }
     fullText += '\n';
   }
   return fullText;
+}
+
+// Los "Recibo de Pago" son un formulario de DOS COLUMNAS: el campo izquierdo y el
+// derecho de una misma fila visual comparten casi la misma coordenada Y, así que
+// agrupar por línea los mezcla. Hay que separar primero por columna (el hueco más
+// grande entre coordenadas X de la página) y leer cada columna de arriba a abajo.
+async function extractPdfColumns(arrayBuffer) {
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+  const content = await page.getTextContent();
+  const items = content.items.filter(it => it.str && it.str.trim());
+  if (items.length < 4) return { left: [], right: [] };
+  const xs = items.map(it => it.transform[4]).sort((a, b) => a - b);
+  let maxGap = 0, splitAt = xs[0];
+  for (let i = 1; i < xs.length; i++) {
+    const gap = xs[i] - xs[i - 1];
+    if (gap > maxGap) { maxGap = gap; splitAt = (xs[i] + xs[i - 1]) / 2; }
+  }
+  const left = items.filter(it => it.transform[4] < splitAt).sort((a, b) => b.transform[5] - a.transform[5]).map(i => i.str.trim());
+  const right = items.filter(it => it.transform[4] >= splitAt).sort((a, b) => b.transform[5] - a.transform[5]).map(i => i.str.trim());
+  return { left, right };
+}
+
+function limpiarColumna(arr) {
+  return arr.filter(l =>
+    !l.startsWith('Dirección') && !l.startsWith('Teléfono') && !l.startsWith('www.') &&
+    !l.startsWith('Firma') && !l.startsWith('Recibo de Pago')
+  );
 }
 
 // ===================== REGLAS DE PARSEO (mismas que conciliar_facturacion.js) =====================
@@ -103,22 +136,26 @@ function parseFacturaText(text, filename) {
   return { skipped: true, archivo: filename, razon: null }; // null = probar como abono
 }
 
-function parseAbonoText(text, filename) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean).filter(l =>
-    !l.startsWith('Dirección') && !l.startsWith('Teléfono') && !l.startsWith('www.') &&
-    !l.startsWith('Firma') && !l.startsWith('--')
-  );
-  if (lines.length !== 11) {
-    return { skipped: true, archivo: filename, razon: `No coincide con la plantilla de Recibo de Pago (${lines.length} líneas detectadas, se esperaban 11)` };
+function parseAbonoColumns(left, right, filename) {
+  // Columna izquierda (de arriba a abajo): fecha, pagado a, tipo id, valor factura, retención, admon
+  // Columna derecha (de arriba a abajo): identificación, factura, abono, forma de pago, pendiente
+  const L = limpiarColumna(left);
+  const R = limpiarColumna(right);
+  if (L.length < 6 || R.length < 5) {
+    return { skipped: true, archivo: filename, razon: `No coincide con la plantilla de Recibo de Pago (columnas de ${L.length}/${R.length}, se esperaban 6/5)` };
   }
-  const fecha = parseSpanishLongDate(lines[0]);
-  const factura = normFactura(lines[4]);
-  const valorFactura = parseUSNumber(lines[5]);
-  const retencion = parseUSNumber(lines[6]);
-  const abono = parseUSNumber(lines[8]);
-  const formaPago = lines[9];
-  const pendienteRecibo = parseUSNumber(lines[10]);
-  if (!factura || isNaN(abono)) return { skipped: true, archivo: filename, razon: 'No se pudo extraer factura/abono de la plantilla' };
+  const fecha = parseSpanishLongDate(L[0]);
+  const valorFactura = parseUSNumber(L[3]);
+  const retencion = parseUSNumber(L[4]);
+  const factura = normFactura(R[1]);
+  const abono = parseUSNumber(R[2]);
+  const formaPago = R[3];
+  const pendienteRecibo = parseUSNumber(R[4]);
+
+  // Red de seguridad: si algun campo clave no tiene la forma esperada, no guardar basura.
+  if (!/^JMA\d+$/.test(factura)) return { skipped: true, archivo: filename, razon: `No se reconoció el número de factura ("${R[1]}")` };
+  if (isNaN(abono) || isNaN(valorFactura)) return { skipped: true, archivo: filename, razon: 'No se pudieron leer los valores numéricos del recibo' };
+
   return { skipped: false, archivo: filename, factura, fecha, valorFactura, retencion, abono, formaPago, pendienteRecibo };
 }
 
@@ -148,10 +185,11 @@ function logLine(tag, label, filename) {
 
 // ===================== PROCESAR ARCHIVOS SUBIDOS =====================
 async function procesarArchivo(file) {
-  const buf = await file.arrayBuffer();
   let text;
   try {
-    text = await extractPdfText(buf);
+    // cada llamada a pdfjsLib necesita su propio ArrayBuffer (el worker puede
+    // transferir/vaciar el buffer anterior), por eso se vuelve a leer el archivo.
+    text = await extractPdfText(await file.arrayBuffer());
   } catch (e) {
     logLine('err', `No se pudo leer el PDF (${e.message}).`, file.name);
     return;
@@ -167,7 +205,14 @@ async function procesarArchivo(file) {
     return;
   }
 
-  const abonoResult = parseAbonoText(text, file.name);
+  let columns;
+  try {
+    columns = await extractPdfColumns(await file.arrayBuffer());
+  } catch (e) {
+    logLine('err', `No se pudo leer el PDF por columnas (${e.message}).`, file.name);
+    return;
+  }
+  const abonoResult = parseAbonoColumns(columns.left, columns.right, file.name);
   if (!abonoResult.skipped) {
     await guardarAbono(abonoResult);
     return;
