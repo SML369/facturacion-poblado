@@ -17,7 +17,7 @@ async function sbUpsert(tabla, row) {
 document.getElementById('supaProject').textContent = new URL(SUPA_URL).hostname.split('.')[0];
 
 // ===================== pdf.js SETUP =====================
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 async function extractPdfText(arrayBuffer) {
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
