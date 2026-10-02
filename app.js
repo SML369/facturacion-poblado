@@ -14,8 +14,6 @@ async function sbUpsert(tabla, row) {
   if (!r.ok) throw new Error(`Error al guardar en ${tabla}: ${r.status}`);
 }
 
-document.getElementById('supaProject').textContent = new URL(SUPA_URL).hostname.split('.')[0];
-
 // ===================== pdf.js SETUP =====================
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
