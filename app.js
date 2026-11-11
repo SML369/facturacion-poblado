@@ -1,17 +1,40 @@
 // ===================== SUPABASE CONFIG =====================
 const SUPA_URL = 'https://hlldcoemekqecqhtuahx.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhsbGRjb2VtZWtxZWNxaHR1YWh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NTM0NTMsImV4cCI6MjEwNjUyOTQ1M30.x-yGOivwv17y-xTd0hZniV5N3v0DVlCeDByDkOfnlcQ';
-const H = { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY };
+// La llave anon es publica; lo que protege los datos es el login (RLS solo permite usuarios autenticados).
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
+async function headers() {
+  const { data } = await sb.auth.getSession();
+  const token = data.session ? data.session.access_token : SUPA_KEY;
+  return { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + token };
+}
+
+// Supabase devuelve maximo 1000 filas por consulta: se pagina.
 async function sbGetAll(tabla) {
-  const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}?select=*`, { headers: H });
-  return r.ok ? r.json() : [];
+  const todas = [];
+  for (let desde = 0; ; desde += 1000) {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}?select=*&order=id&offset=${desde}&limit=1000`, { headers: await headers() });
+    if (!r.ok) return todas;
+    const filas = await r.json();
+    todas.push(...filas);
+    if (filas.length < 1000) return todas;
+  }
 }
 async function sbUpsert(tabla, row) {
   const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}`, {
-    method: 'POST', headers: { ...H, Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(row),
+    method: 'POST', headers: { ...(await headers()), Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(row),
   });
   if (!r.ok) throw new Error(`Error al guardar en ${tabla}: ${r.status}`);
+}
+// POST / PATCH / DELETE devolviendo las filas afectadas.
+async function sbRequest(method, ruta, body) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${ruta}`, {
+    method, headers: { ...(await headers()), Prefer: 'return=representation' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
 }
 
 // ===================== pdf.js SETUP =====================
@@ -190,6 +213,11 @@ async function procesarArchivo(file) {
     text = await extractPdfText(await file.arrayBuffer());
   } catch (e) {
     logLine('err', `No se pudo leer el PDF (${e.message}).`, file.name);
+    return;
+  }
+
+  if (esRelacion(text)) {
+    await procesarRelacion(file);
     return;
   }
 
@@ -433,8 +461,46 @@ document.getElementById('q').addEventListener('input', render);
 document.getElementById('statusFilter').addEventListener('change', render);
 document.getElementById('exportBtn').addEventListener('click', exportarExcel);
 
-// ===================== INICIO =====================
-(async () => {
+// ===================== PESTAÑAS =====================
+function mostrarVista(nombre) {
+  document.querySelectorAll('[data-vista]').forEach(el => { el.hidden = el.dataset.vista !== nombre; });
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === nombre ? 'true' : 'false'));
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => mostrarVista(t.dataset.tab)));
+
+// ===================== LOGIN =====================
+async function arrancarApp() {
+  document.getElementById('login').hidden = true;
+  document.getElementById('app').hidden = false;
+  mostrarVista('pacientes');
   await cargarTodo();
   await render();
+  await iniciarPacientes();
+}
+
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = document.getElementById('loginError');
+  const btn = e.target.querySelector('button');
+  err.textContent = '';
+  btn.disabled = true;
+  const { error } = await sb.auth.signInWithPassword({
+    email: document.getElementById('loginEmail').value.trim(),
+    password: document.getElementById('loginPass').value,
+  });
+  btn.disabled = false;
+  if (error) { err.textContent = 'Correo o contraseña incorrectos.'; return; }
+  await arrancarApp();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  location.reload();
+});
+
+// ===================== INICIO =====================
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data.session) await arrancarApp();
+  else document.getElementById('login').hidden = false;
 })();

@@ -22,6 +22,7 @@
     --shadow: 0 1px 2px rgba(17,34,43,0.06), 0 8px 24px -16px rgba(17,34,43,0.28);
   }
   *{box-sizing:border-box}
+  [hidden]{display:none !important}
   body{margin:0; background:var(--paper); color:var(--ink); font-family:"Roboto",system-ui,sans-serif; font-size:14px; line-height:1.5}
   .wrap{max-width:1080px; margin:0 auto; padding:0 24px 64px}
   h1,h2,h3{font-family:"Raleway",Georgia,serif; font-weight:700; text-wrap:balance; margin:0}
@@ -112,6 +113,71 @@
   .panel.critical li{background:var(--critical-tint)}
   .panel.neutral li{background:var(--line-soft)}
 
+  /* ---------- Login ---------- */
+  .login{min-height:100vh; display:grid; place-items:center; padding:24px 16px; background:var(--navy-deep)}
+  .login-card{width:100%; max-width:360px; background:var(--paper-raised); border-radius:14px; padding:28px 24px; border-top:4px solid var(--terracotta)}
+  .login-card h1{font-size:22px; color:var(--navy); margin-bottom:4px}
+  .login-card p{margin:0 0 18px; color:var(--ink-soft); font-size:13px}
+  .login-card label{display:block; font-size:12px; font-weight:600; color:var(--ink-soft); margin:12px 0 5px}
+  .login-card button{width:100%; margin-top:18px; justify-content:center}
+  .login-error{color:var(--critical); font-size:13px; min-height:18px; margin-top:10px}
+
+  /* ---------- Pestañas ---------- */
+  .masthead-top{display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
+  .logout{background:transparent; border:1px solid rgba(238,245,250,.3); color:#cfe0ea; border-radius:8px; padding:6px 10px; font:inherit; font-size:12px; cursor:pointer}
+  .tabs{display:flex; gap:6px; margin-top:18px}
+  .tab{font:inherit; font-weight:600; font-size:14px; padding:8px 16px; border-radius:999px; border:1px solid rgba(238,245,250,.25); background:transparent; color:#cfe0ea; cursor:pointer}
+  .tab[aria-selected="true"]{background:var(--terracotta); border-color:var(--terracotta); color:#fff}
+
+  /* ---------- Formulario de pacientes ---------- */
+  input,select,textarea{font-size:16px} /* evita el zoom automatico en iPhone */
+  .card{background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); padding:18px; margin-top:26px}
+  .card h2{font-size:17px; color:var(--navy); margin-bottom:12px}
+  .grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
+  .grid .span2{grid-column:span 2}
+  .field label{display:block; font-size:11.5px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:4px}
+  .field input,.login-card input{width:100%; font:inherit; font-size:16px; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:9px 11px}
+  .field input:focus,.login-card input:focus{outline:2px solid var(--terracotta); outline-offset:-1px; background:#fff}
+  .hint{font-size:11.5px; color:var(--ink-soft); margin-top:4px; min-height:15px}
+  details.clinico{margin-top:16px; border-top:1px dashed var(--line); padding-top:12px}
+  details.clinico summary{cursor:pointer; font-weight:600; color:var(--navy); font-size:14px}
+  details.clinico .grid{margin-top:12px}
+  .form-actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; align-items:center}
+  button.primary{background:var(--navy); color:#fff; border-color:var(--navy)}
+  button.primary:hover{background:var(--navy-deep)}
+  button.danger{color:var(--critical); border-color:var(--critical)}
+  .aviso{background:var(--good-tint); color:var(--good); font-weight:600; font-size:13px; padding:6px 12px; border-radius:8px}
+
+  /* ---------- Lista de pacientes ---------- */
+  .prow{display:grid; grid-template-columns:88px 1fr 150px 50px 110px 170px; gap:10px; align-items:center; padding:11px 16px; border-bottom:1px solid var(--line-soft); cursor:pointer}
+  .prow:hover{background:var(--navy-tint)}
+  .prow:last-child{border-bottom:0}
+  .prow .fecha{color:var(--ink-soft); font-size:13px}
+  .prow .pac b{display:block; font-weight:600; color:var(--ink)}
+  .prow .pac span{display:block; font-size:12px; color:var(--ink-soft)}
+  .prow .emp{font-size:12.5px; color:var(--ink-soft)}
+  .prow .num{text-align:right}
+  .prow-head{cursor:default; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); border-bottom:1px solid var(--line)}
+  .prow-head:hover{background:transparent}
+  .pill.pagado{background:var(--good-tint); color:var(--good)}
+  .pill.enrelacion{background:var(--terracotta-tint); color:var(--terracotta)}
+  .pill.sinrelacion{background:var(--critical-tint); color:var(--critical)}
+  .pill.reciente{background:var(--navy-tint); color:var(--navy)}
+  .empty-list{padding:24px; text-align:center; color:var(--ink-soft)}
+  .controls input[type=month]{font:inherit; color:var(--ink); background:var(--paper-raised); border:1px solid var(--line); border-radius:8px; padding:7px 10px}
+
+  @media (max-width:760px){
+    .wrap{padding:0 16px 48px} .masthead{padding:24px 16px 20px}
+    .grid{grid-template-columns:1fr 1fr} .grid .span2{grid-column:1/-1}
+    .prow{grid-template-columns:1fr auto; gap:4px 10px}
+    .prow-head{display:none}
+    .prow .fecha{grid-column:1; grid-row:1}
+    .prow .pac{grid-column:1/-1; grid-row:2}
+    .prow .emp,.prow .num:nth-of-type(4){display:none}
+    .prow>div:last-child{grid-column:2; grid-row:1; justify-self:end}
+    .prow .num:nth-of-type(5){grid-column:1/-1; grid-row:3; text-align:left; font-size:12.5px; color:var(--ink-soft)}
+  }
+
   .loading{display:inline-block; width:13px; height:13px; border:2px solid var(--navy); border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px}
   @keyframes spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion: reduce){*{transition:none !important} .loading{animation:none}}
@@ -119,19 +185,125 @@
 </head>
 <body>
 
+<section class="login" id="login" hidden>
+  <form class="login-card" id="loginForm">
+    <h1>Honorarios JMA</h1>
+    <p>Dr. Jorge Iván Mejía Peláez · Centro de Ortopedia El Poblado</p>
+    <label for="loginEmail">Correo</label>
+    <input id="loginEmail" type="email" autocomplete="username" required>
+    <label for="loginPass">Contraseña</label>
+    <input id="loginPass" type="password" autocomplete="current-password" required>
+    <button class="btn primary" type="submit">Entrar</button>
+    <div class="login-error" id="loginError"></div>
+  </form>
+</section>
+
+<div id="app" hidden>
 <header class="masthead">
   <div class="masthead-inner">
-    <div class="eyebrow">Dr. Jorge Iván Mejía Peláez · Centro de Ortopedia El Poblado · NIT 70093445-7</div>
-    <h1>Cartera de honorarios JMA</h1>
-    <p>Sube los PDF de facturas electrónicas y de recibos de abono — el sistema los lee, detecta duplicados y recalcula la conciliación solo.</p>
-    <div class="tiles" id="tiles"></div>
+    <div class="masthead-top">
+      <div class="eyebrow">Dr. Jorge Iván Mejía Peláez · Centro de Ortopedia El Poblado · NIT 70093445-7</div>
+      <button class="logout" id="logoutBtn" type="button">Salir</button>
+    </div>
+    <h1>Honorarios JMA</h1>
+    <nav class="tabs" role="tablist">
+      <button class="tab" type="button" role="tab" data-tab="pacientes">Pacientes</button>
+      <button class="tab" type="button" role="tab" data-tab="cartera">Cartera</button>
+    </nav>
+    <div data-vista="pacientes">
+      <p>Registra cada paciente que atiendes. Al subir las relaciones de la clínica (pestaña Cartera) se marca solo cuáles ya pagaron.</p>
+      <div class="tiles" id="pacTiles"></div>
+    </div>
+    <div data-vista="cartera" hidden>
+      <p>Sube los PDF de facturas electrónicas, recibos de abono y relaciones de pacientes — el sistema los lee, detecta duplicados y recalcula la conciliación solo.</p>
+      <div class="tiles" id="tiles"></div>
+    </div>
   </div>
 </header>
 
 <div class="wrap">
+<section data-vista="pacientes">
+  <form class="card" id="pacForm" autocomplete="off">
+    <h2 id="pacFormTitulo">Nuevo paciente</h2>
+    <div class="grid">
+      <div class="field"><label for="f_fecha">Fecha</label><input id="f_fecha" name="fecha" type="date" required></div>
+      <div class="field"><label for="f_institucion">Institución</label><input id="f_institucion" name="institucion" list="dl_institucion" autocapitalize="characters"></div>
+      <div class="field span2"><label for="f_cirujano">Cirujano</label><input id="f_cirujano" name="cirujano" list="dl_cirujano" autocapitalize="characters"></div>
+      <div class="field span2"><label for="f_nombre">Nombre</label><input id="f_nombre" name="nombre" required autocapitalize="characters"></div>
+      <div class="field span2"><label for="f_apellidos">Apellidos</label><input id="f_apellidos" name="apellidos" autocapitalize="characters"></div>
+      <div class="field"><label for="f_edad">Edad</label><input id="f_edad" name="edad" type="number" inputmode="numeric" min="0" max="120"></div>
+      <div class="field"><label for="f_empresa">Aseguradora</label><input id="f_empresa" name="empresa" list="dl_empresa" autocapitalize="characters"></div>
+      <div class="field span2"><label for="f_procedimiento">Procedimiento</label><input id="f_procedimiento" name="procedimiento" list="dl_procedimiento" autocapitalize="characters"></div>
+      <div class="field"><label for="f_uvr">UVR</label><input id="f_uvr" name="uvr" type="number" inputmode="decimal" step="0.5" min="0"></div>
+      <div class="field"><label for="f_valor">Valor ($)</label><input id="f_valor" name="valor" type="number" inputmode="numeric" min="0"></div>
+      <div class="field span2"><label>&nbsp;</label><div class="hint" id="valorHint"></div></div>
+    </div>
+    <details class="clinico">
+      <summary>Datos clínicos (ASA, técnica, medicamentos…)</summary>
+      <div class="grid">
+        <div class="field"><label for="f_asa">ASA</label><input id="f_asa" name="asa" list="dl_asa" autocapitalize="characters"></div>
+        <div class="field"><label for="f_duracion">Duración</label><input id="f_duracion" name="duracion" list="dl_duracion" autocapitalize="characters"></div>
+        <div class="field span2"><label for="f_comorbilidad">Comorbilidad</label><input id="f_comorbilidad" name="comorbilidad" list="dl_comorbilidad" autocapitalize="characters"></div>
+        <div class="field"><label for="f_tecnica">Técnica</label><input id="f_tecnica" name="tecnica" list="dl_tecnica" autocapitalize="characters"></div>
+        <div class="field span2"><label for="f_medicamentos">Medicamentos</label><input id="f_medicamentos" name="medicamentos" list="dl_medicamentos" autocapitalize="characters"></div>
+        <div class="field"><label for="f_via_aerea">Vía aérea</label><input id="f_via_aerea" name="via_aerea" list="dl_via_aerea" autocapitalize="characters"></div>
+        <div class="field"><label for="f_relajante">Relajante</label><input id="f_relajante" name="relajante" list="dl_relajante" autocapitalize="characters"></div>
+        <div class="field span2"><label for="f_bloqueo">Bloqueo</label><input id="f_bloqueo" name="bloqueo" list="dl_bloqueo" autocapitalize="characters"></div>
+        <div class="field"><label for="f_metodo">Método</label><input id="f_metodo" name="metodo" list="dl_metodo" autocapitalize="characters"></div>
+        <div class="field"><label for="f_anestesico">Anestésico</label><input id="f_anestesico" name="anestesico" list="dl_anestesico" autocapitalize="characters"></div>
+      </div>
+    </details>
+    <div class="form-actions">
+      <button class="btn primary" type="submit" id="pacGuardar">Guardar paciente</button>
+      <button class="btn" type="button" id="pacRepetir" title="Copia fecha, cirujano, procedimiento y datos de anestesia del último paciente">Repetir anterior</button>
+      <button class="btn" type="button" id="pacCancelar" hidden>Cancelar</button>
+      <button class="btn danger" type="button" id="pacEliminar" hidden>Eliminar</button>
+      <span class="aviso" id="pacAviso" hidden></span>
+    </div>
+    <datalist id="dl_institucion"></datalist><datalist id="dl_empresa"></datalist><datalist id="dl_procedimiento"></datalist>
+    <datalist id="dl_cirujano"></datalist><datalist id="dl_asa"></datalist><datalist id="dl_comorbilidad"></datalist>
+    <datalist id="dl_duracion"></datalist><datalist id="dl_tecnica"></datalist><datalist id="dl_medicamentos"></datalist>
+    <datalist id="dl_via_aerea"></datalist><datalist id="dl_relajante"></datalist><datalist id="dl_bloqueo"></datalist>
+    <datalist id="dl_metodo"></datalist><datalist id="dl_anestesico"></datalist>
+  </form>
+
+  <div class="controls">
+    <input type="month" id="pacMes" title="Borra el mes para ver todos">
+    <div class="search"><input id="pacQ" type="text" placeholder="Buscar paciente, aseguradora, cirujano…"></div>
+    <select id="pacEstado">
+      <option value="">Todos los estados</option>
+      <option value="pagado">Pagado</option>
+      <option value="enrelacion">En relación, sin pagar</option>
+      <option value="sinrelacion">No aparece en relación</option>
+      <option value="reciente">Pendiente de relación</option>
+    </select>
+    <button class="btn" type="button" id="pacExport">Descargar Excel</button>
+    <button class="btn" type="button" id="pacImport">Importar Excel</button>
+    <input type="file" id="pacImportFile" accept=".xlsx,.xls" hidden>
+  </div>
+  <div class="table-card">
+    <div class="prow prow-head"><div>Fecha</div><div>Paciente</div><div>Aseguradora</div><div class="num">UVR</div><div class="num">Valor</div><div>Estado</div></div>
+    <div id="pacRows"></div>
+  </div>
+
+  <div class="panels">
+    <div class="panel critical">
+      <h3>No aparecen en ninguna relación</h3>
+      <div class="sub">Pacientes con más de 45 días que la clínica no ha relacionado</div>
+      <ul id="pacSinRelacion"></ul>
+    </div>
+    <div class="panel neutral">
+      <h3>En relación pero no digitados</h3>
+      <div class="sub">Pacientes que la clínica relacionó y no están registrados aquí</div>
+      <ul id="pacSinDigitar"></ul>
+    </div>
+  </div>
+</section>
+
+<section data-vista="cartera" hidden>
   <div class="dropzone" id="dropzone" tabindex="0" role="button">
     <b>Arrastra aquí tus PDF nuevos</b>
-    <p>Facturas DIAN o recibos de abono — se aceptan varios a la vez. También puedes <u>hacer clic para elegir archivos</u>.</p>
+    <p>Facturas DIAN, recibos de abono o relaciones de pacientes — se aceptan varios a la vez. También puedes <u>hacer clic para elegir archivos</u>.</p>
     <input type="file" id="fileInput" accept="application/pdf" multiple>
   </div>
   <div class="log" id="log"></div>
@@ -174,8 +346,12 @@
       <ul id="unknownList"><li>Ninguno todavía.</li></ul>
     </div>
   </div>
+</section>
+</div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="pacientes.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,34 @@
+name: Keep-alive Supabase
+
+# Supabase pausa los proyectos gratuitos tras unos dias sin uso.
+# Este ping diario lo evita aunque nadie abra la app.
+on:
+  schedule:
+    - cron: '17 11 * * *'   # 6:17 a.m. hora Colombia
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Consultar fp_ping
+        run: |
+          # La llave anon es publica y ya va en app.js; se lee de ahi para no duplicarla.
+          URL=$(sed -n "s/^const SUPA_URL *= *'\([^']*\)'.*/\1/p" app.js)
+          KEY=$(sed -n "s/^const SUPA_KEY *= *'\([^']*\)'.*/\1/p" app.js)
+          curl --fail --silent --show-error --max-time 30 --retry 3 --retry-delay 20 \
+            "$URL/rest/v1/fp_ping?select=id" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+
+      - name: Mantener activo el cron
+        # GitHub desactiva los cron de un repo sin actividad en 60 dias;
+        # volver a habilitar el workflow reinicia ese contador.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable keepalive.yml --repo "$GITHUB_REPOSITORY"
