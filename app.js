@@ -6,16 +6,18 @@ const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
 async function headers() {
   const { data } = await sb.auth.getSession();
-  const token = data.session ? data.session.access_token : SUPA_KEY;
-  return { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + token };
+  if (!data.session) throw new Error('No hay sesión activa o no hay conexión. Revisa el internet; si sigue igual, recarga la página y vuelve a entrar.');
+  return { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + data.session.access_token };
 }
 
 // Supabase devuelve maximo 1000 filas por consulta: se pagina.
+// Si una pagina falla se lanza el error: devolver datos a medias haria ver la app vacia
+// y una reimportacion crearia duplicados.
 async function sbGetAll(tabla) {
   const todas = [];
   for (let desde = 0; ; desde += 1000) {
     const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}?select=*&order=id&offset=${desde}&limit=1000`, { headers: await headers() });
-    if (!r.ok) return todas;
+    if (!r.ok) throw new Error(`No se pudo leer ${tabla}: ${r.status}`);
     const filas = await r.json();
     todas.push(...filas);
     if (filas.length < 1000) return todas;
@@ -42,7 +44,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
 async function extractPdfText(arrayBuffer) {
   // Las facturas DIAN son texto corrido normal: agrupar por linea (Y) funciona bien.
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, isEvalSupported: false }).promise;
   let fullText = '';
   const TOL = 1.5;
   for (let p = 1; p <= pdf.numPages; p++) {
@@ -79,7 +81,7 @@ async function extractPdfText(arrayBuffer) {
 // agrupar por línea los mezcla. Hay que separar primero por columna (el hueco más
 // grande entre coordenadas X de la página) y leer cada columna de arriba a abajo.
 async function extractPdfColumns(arrayBuffer) {
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, isEvalSupported: false }).promise;
   const page = await pdf.getPage(1);
   const content = await page.getTextContent();
   const items = content.items.filter(it => it.str && it.str.trim());
@@ -128,7 +130,10 @@ function parseSpanishLongDate(s) {
   if (!mes) return null;
   return new Date(parseInt(m[3]), mes - 1, parseInt(m[1]));
 }
-function isoDate(d) { return d ? d.toISOString().slice(0, 10) : 'sinfecha'; }
+// Fecha local (no UTC): con toISOString el id del abono cambiaria segun la zona horaria del dispositivo.
+function isoDate(d) {
+  return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : 'sinfecha';
+}
 
 function parseFacturaText(text, filename) {
   if (/^Comprobante/i.test(filename)) {
@@ -200,11 +205,24 @@ function logLine(tag, label, filename) {
   const div = document.createElement('div');
   div.className = 'logline ' + tag;
   const tagText = { ok: 'OK', dup: 'Duplicado', err: 'Revisar' }[tag] || tag;
-  div.innerHTML = `<span class="tag">${tagText}</span><span>${label} <span class="file">${filename}</span></span>`;
+  // El texto sale de los PDF y de sus nombres de archivo: se escapa antes de insertarlo.
+  div.innerHTML = `<span class="tag">${tagText}</span><span>${esc(label)} <span class="file">${esc(filename)}</span></span>`;
   logEl.prepend(div);
+  if (tag === 'err') anotarSinProcesar(label, filename);
+}
+
+let HAY_SIN_PROCESAR = false;
+function anotarSinProcesar(motivo, filename) {
+  const lista = document.getElementById('unknownList');
+  if (!HAY_SIN_PROCESAR) lista.innerHTML = '';
+  HAY_SIN_PROCESAR = true;
+  const li = document.createElement('li');
+  li.textContent = `${filename}: ${motivo}`;
+  lista.prepend(li);
 }
 
 // ===================== PROCESAR ARCHIVOS SUBIDOS =====================
+// Devuelve true si guardo una relacion de pacientes nueva.
 async function procesarArchivo(file) {
   let text;
   try {
@@ -213,22 +231,19 @@ async function procesarArchivo(file) {
     text = await extractPdfText(await file.arrayBuffer());
   } catch (e) {
     logLine('err', `No se pudo leer el PDF (${e.message}).`, file.name);
-    return;
+    return false;
   }
 
-  if (esRelacion(text)) {
-    await procesarRelacion(file);
-    return;
-  }
+  if (esRelacion(text)) return procesarRelacion(file);
 
   const facturaResult = parseFacturaText(text, file.name);
   if (!facturaResult.skipped) {
     await guardarFactura(facturaResult);
-    return;
+    return false;
   }
   if (facturaResult.razon) {
     logLine('err', facturaResult.razon, file.name);
-    return;
+    return false;
   }
 
   let columns;
@@ -236,14 +251,15 @@ async function procesarArchivo(file) {
     columns = await extractPdfColumns(await file.arrayBuffer());
   } catch (e) {
     logLine('err', `No se pudo leer el PDF por columnas (${e.message}).`, file.name);
-    return;
+    return false;
   }
   const abonoResult = parseAbonoColumns(columns.left, columns.right, file.name);
   if (!abonoResult.skipped) {
     await guardarAbono(abonoResult);
-    return;
+    return false;
   }
   logLine('err', abonoResult.razon, file.name);
+  return false;
 }
 
 async function guardarFactura(f) {
@@ -328,8 +344,9 @@ function calcularConciliacion() {
 }
 
 function estado(r, facturasConIssue) {
-  if (facturasConIssue.has(r.factura)) return 'revisar';
+  // Va primero: "sin abonos" tambien se anota como inconsistencia y quedaria siempre como "revisar".
   if (r.numAbonos === 0) return 'sinabonos';
+  if (facturasConIssue.has(r.factura)) return 'revisar';
   if (r.saldo <= 500) return 'pagada';
   return 'pendiente';
 }
@@ -374,7 +391,7 @@ async function render() {
     const fechaStr = r.fecha ? new Date(r.fecha).toLocaleDateString('es-CO') : '';
     wrap.innerHTML = `
       <div class="frow" tabindex="0" role="button" aria-expanded="false">
-        <div class="factura">${r.factura}</div>
+        <div class="factura">${esc(r.factura)}</div>
         <div class="fecha">${fechaStr}</div>
         <div class="num mono">${cop(r.total)}</div>
         <div class="num mono">${cop(r.retencion)}</div>
@@ -394,14 +411,17 @@ async function render() {
   });
 
   document.getElementById('incList').innerHTML = inconsistencias.length
-    ? inconsistencias.map(i => `<li>${i}</li>`).join('') : '<li>Sin inconsistencias.</li>';
+    ? inconsistencias.map(i => `<li>${esc(i)}</li>`).join('') : '<li>Sin inconsistencias.</li>';
+
+  // El estado "Pagado" de los pacientes tambien depende de los saldos: se refresca la lista.
+  if (PACIENTES.size) renderPacientes();
 }
 
 function renderDetalle(list) {
   if (!list.length) return '<div class="empty">Sin abonos registrados para esta factura.</div>';
   const rows = list.map(a => `
     <tr><td class="mono">${a.fecha ? new Date(a.fecha).toLocaleDateString('es-CO') : ''}</td>
-    <td class="num mono">${cop(a.abono)}</td><td>${a.formaPago || ''}</td><td class="archivo">${a.archivo}</td></tr>`).join('');
+    <td class="num mono">${cop(a.abono)}</td><td>${esc(a.formaPago)}</td><td class="archivo">${esc(a.archivo)}</td></tr>`).join('');
   return `<table><thead><tr><th>Fecha</th><th class="num">Abono</th><th>Forma de pago</th><th>Archivo</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -434,7 +454,7 @@ function exportarExcel() {
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(inconsistencias.map(d => ({ Detalle: d }))), 'Inconsistencias');
 
-  const fecha = new Date().toISOString().slice(0, 10);
+  const fecha = hoyISO();
   XLSX.writeFile(wb, `Conciliacion Facturas ${fecha}.xlsx`);
 }
 
@@ -451,10 +471,18 @@ fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
 async function handleFiles(fileList) {
   const files = [...fileList].filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  let hayRelacionNueva = false;
   for (const f of files) {
-    await procesarArchivo(f);
+    try {
+      if (await procesarArchivo(f)) hayRelacionNueva = true;
+    } catch (e) {
+      // Un archivo que falla al guardar no debe detener los demas.
+      logLine('err', `No se pudo guardar (${e.message}).`, f.name);
+    }
   }
   fileInput.value = '';
+  // El cruce con los pacientes se rehace una sola vez, al final de la tanda.
+  if (hayRelacionNueva) await sincronizarCruce();
 }
 
 document.getElementById('q').addEventListener('input', render);
@@ -469,13 +497,24 @@ function mostrarVista(nombre) {
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => mostrarVista(t.dataset.tab)));
 
 // ===================== LOGIN =====================
+let ULTIMA_CARGA = 0;   // momento (ms) de la ultima lectura completa de datos
+
 async function arrancarApp() {
   document.getElementById('login').hidden = true;
+  document.getElementById('errorCarga').hidden = true;
   document.getElementById('app').hidden = false;
   mostrarVista('pacientes');
-  await cargarTodo();
-  await render();
-  await iniciarPacientes();
+  try {
+    await cargarTodo();
+    await render();
+    await iniciarPacientes();
+    ULTIMA_CARGA = Date.now();
+  } catch (e) {
+    // Sin los datos no se deja usar la app: importar o subir archivos sobre una lista vacia duplicaria registros.
+    document.getElementById('app').hidden = true;
+    document.getElementById('errorCargaDetalle').textContent = e.message;
+    document.getElementById('errorCarga').hidden = false;
+  }
 }
 
 document.getElementById('loginForm').addEventListener('submit', async e => {
@@ -489,18 +528,50 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     password: document.getElementById('loginPass').value,
   });
   btn.disabled = false;
-  if (error) { err.textContent = 'Correo o contraseña incorrectos.'; return; }
+  if (error) {
+    // 400 = credenciales invalidas; lo demas es red caida, demasiados intentos o servicio pausado.
+    err.textContent = error.status === 400 ? 'Correo o contraseña incorrectos.'
+      : 'No se pudo iniciar sesión. Revisa la conexión e intenta de nuevo en un momento.';
+    return;
+  }
   await arrancarApp();
 });
 
 document.getElementById('logoutBtn').addEventListener('click', async () => {
-  await sb.auth.signOut();
+  // scope local: cierra la sesion solo en este dispositivo (por defecto la cierra en todos).
+  const { error } = await sb.auth.signOut({ scope: 'local' });
+  if (error) { alert('No se pudo cerrar la sesión. Revisa la conexión e intenta de nuevo.'); return; }
   location.reload();
 });
 
+// Si la sesion se pierde con la app abierta (vencio o se cerro en otra pestaña), se vuelve al login.
+sb.auth.onAuthStateChange(evento => {
+  if (evento === 'SIGNED_OUT' && document.getElementById('login').hidden) location.reload();
+});
+
+// El celular puede dejar la pestaña abierta por dias: al volver a ella se recargan los datos,
+// para ver lo que se digito o subio desde el otro dispositivo.
+const MINUTOS_PARA_RECARGAR = 5;
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden || document.getElementById('app').hidden) return;
+  if (Date.now() - ULTIMA_CARGA < MINUTOS_PARA_RECARGAR * 60000) return;
+  ULTIMA_CARGA = Date.now();
+  try {
+    await cargarTodo();
+    await render();
+    await cargarPacientes();
+    await sincronizarCruce();
+  } catch (e) {
+    ULTIMA_CARGA = 0;   // sin conexion: se reintenta la proxima vez que se abra la pestaña
+  }
+});
+
 // ===================== INICIO =====================
-(async () => {
+async function iniciar() {
   const { data } = await sb.auth.getSession();
-  if (data.session) await arrancarApp();
-  else document.getElementById('login').hidden = false;
-})();
+  if (data.session) { await arrancarApp(); return; }
+  document.getElementById('errorCarga').hidden = true;
+  document.getElementById('login').hidden = false;
+}
+document.getElementById('reintentarBtn').addEventListener('click', iniciar);
+iniciar();

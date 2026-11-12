@@ -3,17 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Solo se permite cargar codigo de estos origenes y conectarse a Supabase. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://hlldcoemekqecqhtuahx.supabase.co; worker-src blob:; child-src blob:; img-src 'self' data:; object-src 'none'; base-uri 'none'">
 <title>Cartera JMA — Facturación Poblado</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,500;0,600;0,700;1,600&family=Roboto:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- integrity: el navegador rechaza la libreria si el CDN entrega un archivo distinto al verificado. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
 <style>
   /* Paleta tomada del propio sitio de la clínica (ortopoblado.com): azul marino
      #193441, terracota #CD6A2D, pizarra #2F3E56, tintes azules claros. */
   :root{
     --paper:#F4FAFF; --paper-raised:#ffffff;
-    --ink:#17303c; --ink-soft:#54595F;
+    --ink:#17303c; --ink-soft:#3d4a55;
     --navy:#193441; --navy-deep:#0e2029; --navy-tint:#E0ECF8;
     --terracotta:#CD6A2D; --terracotta-tint:#F8E6D6;
     --good:#2E8F52; --good-tint:#E1F3E6;
@@ -23,21 +26,21 @@
   }
   *{box-sizing:border-box}
   [hidden]{display:none !important}
-  body{margin:0; background:var(--paper); color:var(--ink); font-family:"Roboto",system-ui,sans-serif; font-size:14px; line-height:1.5}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:"Roboto",system-ui,sans-serif; font-size:17px; line-height:1.5}
   .wrap{max-width:1080px; margin:0 auto; padding:0 24px 64px}
   h1,h2,h3{font-family:"Raleway",Georgia,serif; font-weight:700; text-wrap:balance; margin:0}
   .mono{font-family:"Roboto Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
 
   .masthead{background:var(--navy-deep); color:#eef5fa; padding:36px 24px 26px; border-bottom:4px solid var(--terracotta)}
   .masthead-inner{max-width:1080px; margin:0 auto}
-  .eyebrow{font-family:"Roboto Mono",monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#e7a87c; margin-bottom:10px}
-  .masthead h1{font-size:28px; color:#fbfdff}
-  .masthead p{margin:8px 0 0; color:#b9cfdd; max-width:64ch; font-size:13.5px}
+  .eyebrow{font-family:"Roboto Mono",monospace; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:#e7a87c; margin-bottom:10px}
+  .masthead h1{font-size:30px; color:#fbfdff}
+  .masthead p{margin:8px 0 0; color:#c6d9e5; max-width:64ch; font-size:15.5px}
 
   .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:rgba(238,245,250,.14); border:1px solid rgba(238,245,250,.14); border-radius:10px; overflow:hidden; margin-top:24px}
   .tile{background:var(--navy-deep); padding:14px 16px}
-  .tile .label{font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:#8fb3c7}
-  .tile .value{font-family:"Raleway",serif; font-size:24px; font-weight:700; color:#fbfdff; margin-top:5px}
+  .tile .label{font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:#a3c3d6}
+  .tile .value{font-family:"Raleway",serif; font-size:26px; font-weight:700; color:#fbfdff; margin-top:5px}
   .tile.flag .value{color:#f0b57e}
 
   .dropzone{
@@ -45,37 +48,38 @@
     padding:26px; text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
   }
   .dropzone.drag{border-color:var(--terracotta); background:var(--terracotta-tint)}
-  .dropzone b{font-family:"Raleway",serif; font-weight:700; font-size:16px; color:var(--navy)}
-  .dropzone p{margin:6px 0 0; color:var(--ink-soft); font-size:12.5px}
+  .dropzone b{font-family:"Raleway",serif; font-weight:700; font-size:18px; color:var(--navy)}
+  .dropzone p{margin:6px 0 0; color:var(--ink-soft); font-size:14.5px}
   .dropzone input{display:none}
 
   .log{margin-top:14px; display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto}
   .log:empty{display:none}
-  .logline{display:flex; gap:10px; align-items:flex-start; font-size:12.5px; padding:8px 11px; border-radius:8px; background:var(--paper-raised); border:1px solid var(--line-soft)}
-  .logline .tag{flex:none; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:5px; margin-top:1px}
+  .logline{display:flex; gap:10px; align-items:flex-start; font-size:14.5px; padding:8px 11px; border-radius:8px; background:var(--paper-raised); border:1px solid var(--line-soft)}
+  .logline .tag{flex:none; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:5px; margin-top:3px}
   .logline.ok .tag{background:var(--good-tint); color:var(--good)}
   .logline.dup .tag{background:var(--terracotta-tint); color:var(--terracotta)}
   .logline.err .tag{background:var(--critical-tint); color:var(--critical)}
-  .logline .file{color:var(--ink-soft); font-family:"Roboto Mono",monospace; font-size:11.5px}
+  .logline .file{color:var(--ink-soft); font-family:"Roboto Mono",monospace; font-size:13px}
 
   .controls{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:28px 0 14px}
-  .search{flex:1 1 220px; display:flex; align-items:center; gap:8px; background:var(--paper-raised); border:1px solid var(--line); border-radius:8px; padding:8px 12px}
-  .search input{border:0; background:transparent; outline:0; color:var(--ink); font:inherit; width:100%}
-  select,button.btn{font:inherit; color:var(--ink); background:var(--paper-raised); border:1px solid var(--line); border-radius:8px; padding:8px 12px; cursor:pointer}
-  button.btn{display:inline-flex; align-items:center; gap:7px; font-weight:600; color:var(--navy-deep); border-color:var(--navy)}
+  .search{flex:1 1 220px; display:flex; align-items:center; gap:8px; background:var(--paper-raised); border:1px solid var(--line); border-radius:8px; padding:0 12px; min-height:48px}
+  .search input{border:0; background:transparent; outline:0; color:var(--ink); font:inherit; font-size:18px; width:100%; min-height:46px}
+  select,button.btn{font:inherit; color:var(--ink); background:var(--paper-raised); border:1px solid var(--line); border-radius:8px; padding:10px 16px; cursor:pointer; min-height:48px}
+  select{font-size:18px; max-width:100%}
+  button.btn{display:inline-flex; align-items:center; justify-content:center; gap:7px; font-weight:600; color:var(--navy-deep); border-color:var(--navy)}
   button.btn:hover{background:var(--navy-tint)}
   button.btn:disabled{opacity:.45; cursor:default}
 
-  .legend{display:flex; gap:14px; flex-wrap:wrap; margin:0 0 18px; font-size:12px; color:var(--ink-soft)}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; margin:0 0 18px; font-size:14px; color:var(--ink-soft)}
   .legend span{display:inline-flex; align-items:center; gap:6px}
   .dot{width:8px; height:8px; border-radius:50%; display:inline-block}
 
   .table-card{background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); overflow:hidden}
   .row-head,.frow{display:grid; grid-template-columns:96px 86px 1fr 1fr 70px 1fr 1fr 116px 20px; gap:10px}
-  .row-head{padding:10px 16px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); border-bottom:1px solid var(--line)}
+  .row-head{padding:10px 16px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); border-bottom:1px solid var(--line)}
   .row-head>div:nth-child(n+3){text-align:right}
   .row-head>div:first-child,.row-head>div:nth-child(2),.row-head>div:nth-child(8){text-align:left}
-  .frow{align-items:center; padding:12px 16px; border-bottom:1px solid var(--line-soft); cursor:pointer; transition:background .12s}
+  .frow{align-items:center; padding:12px 16px; border-bottom:1px solid var(--line-soft); cursor:pointer; transition:background .12s; font-size:15px}
   .frow:hover{background:var(--navy-tint)}
   .frow:last-child{border-bottom:0}
   .frow .factura{font-family:"Roboto Mono",monospace; font-weight:600; color:var(--navy)}
@@ -87,18 +91,18 @@
   .chev{transition:transform .15s; color:var(--ink-soft); justify-self:end}
   .frow[aria-expanded="true"] .chev{transform:rotate(90deg)}
 
-  .pill{display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:600; white-space:nowrap}
+  .pill{display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:13px; font-weight:600; white-space:nowrap}
   .pill.pagada{background:var(--good-tint); color:var(--good)}
   .pill.pendiente{background:var(--terracotta-tint); color:var(--terracotta)}
   .pill.sinabonos,.pill.revisar{background:var(--critical-tint); color:var(--critical)}
 
   .detail{grid-column:1/-1; background:var(--navy-tint); border-top:1px dashed var(--line); padding:14px 16px 16px; display:none}
   .frow[aria-expanded="true"] + .detail{display:block}
-  .detail table{width:100%; border-collapse:collapse; font-size:13px}
-  .detail th{text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); font-weight:600; padding:0 10px 6px}
+  .detail table{width:100%; border-collapse:collapse; font-size:14.5px}
+  .detail th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); font-weight:600; padding:0 10px 6px}
   .detail th.num,.detail td.num{text-align:right}
   .detail td{padding:6px 10px; border-top:1px solid var(--line-soft)}
-  .detail td.archivo{color:var(--ink-soft); font-size:12px}
+  .detail td.archivo{color:var(--ink-soft); font-size:13.5px}
   .detail .empty{padding:6px 10px; color:var(--ink-soft); font-style:italic}
   .contents{display:contents}
 
@@ -106,76 +110,112 @@
   @media (max-width:760px){.panels{grid-template-columns:1fr} .tiles{grid-template-columns:1fr 1fr} .row-head{display:none}
     .frow{grid-template-columns:1fr 1fr}}
   .panel{background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; padding:16px 18px; box-shadow:var(--shadow)}
-  .panel h3{font-size:15px; font-weight:700; margin-bottom:4px; color:var(--navy)}
-  .panel .sub{font-size:12px; color:var(--ink-soft); margin-bottom:12px}
+  .panel h3{font-size:17px; font-weight:700; margin-bottom:4px; color:var(--navy)}
+  .panel .sub{font-size:14px; color:var(--ink-soft); margin-bottom:12px}
   .panel ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px}
-  .panel li{font-size:12.5px; padding:9px 10px; border-radius:8px; line-height:1.45}
+  .panel li{font-size:14.5px; padding:9px 10px; border-radius:8px; line-height:1.45}
   .panel.critical li{background:var(--critical-tint)}
   .panel.neutral li{background:var(--line-soft)}
 
   /* ---------- Login ---------- */
   .login{min-height:100vh; display:grid; place-items:center; padding:24px 16px; background:var(--navy-deep)}
-  .login-card{width:100%; max-width:360px; background:var(--paper-raised); border-radius:14px; padding:28px 24px; border-top:4px solid var(--terracotta)}
-  .login-card h1{font-size:22px; color:var(--navy); margin-bottom:4px}
-  .login-card p{margin:0 0 18px; color:var(--ink-soft); font-size:13px}
-  .login-card label{display:block; font-size:12px; font-weight:600; color:var(--ink-soft); margin:12px 0 5px}
+  .login-card{width:100%; max-width:380px; background:var(--paper-raised); border-radius:14px; padding:28px 24px; border-top:4px solid var(--terracotta)}
+  .login-card h1{font-size:24px; color:var(--navy); margin-bottom:4px}
+  .login-card p{margin:0 0 18px; color:var(--ink-soft); font-size:15px}
+  .login-card label{display:block; font-size:13px; font-weight:600; color:var(--ink-soft); margin:12px 0 5px}
   .login-card button{width:100%; margin-top:18px; justify-content:center}
-  .login-error{color:var(--critical); font-size:13px; min-height:18px; margin-top:10px}
+  .login-error{color:var(--critical); font-size:15px; min-height:18px; margin-top:10px}
 
   /* ---------- Pestañas ---------- */
   .masthead-top{display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
-  .logout{background:transparent; border:1px solid rgba(238,245,250,.3); color:#cfe0ea; border-radius:8px; padding:6px 10px; font:inherit; font-size:12px; cursor:pointer}
-  .tabs{display:flex; gap:6px; margin-top:18px}
-  .tab{font:inherit; font-weight:600; font-size:14px; padding:8px 16px; border-radius:999px; border:1px solid rgba(238,245,250,.25); background:transparent; color:#cfe0ea; cursor:pointer}
+  .logout{background:transparent; border:1px solid rgba(238,245,250,.3); color:#dbe8f0; border-radius:8px; padding:8px 14px; font:inherit; font-size:15px; min-height:44px; cursor:pointer}
+  .tabs{display:flex; gap:8px; margin-top:18px}
+  .tab{font:inherit; font-weight:700; font-size:18px; padding:12px 26px; min-height:50px; border-radius:999px; border:2px solid rgba(238,245,250,.35); background:transparent; color:#dbe8f0; cursor:pointer}
   .tab[aria-selected="true"]{background:var(--terracotta); border-color:var(--terracotta); color:#fff}
 
   /* ---------- Formulario de pacientes ---------- */
-  input,select,textarea{font-size:16px} /* evita el zoom automatico en iPhone */
+  input,select,textarea{font-size:18px} /* 16px o mas evita el zoom automatico en iPhone */
   .card{background:var(--paper-raised); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); padding:18px; margin-top:26px}
-  .card h2{font-size:17px; color:var(--navy); margin-bottom:12px}
-  .grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
+  .card h2{font-size:20px; color:var(--navy); margin-bottom:14px}
+  .grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px 12px}
   .grid .span2{grid-column:span 2}
-  .field label{display:block; font-size:11.5px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:4px}
-  .field input,.login-card input{width:100%; font:inherit; font-size:16px; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:9px 11px}
+  .field label{display:block; font-size:13px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:5px}
+  .field input,.login-card input{width:100%; font:inherit; font-size:18px; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-height:48px}
   .field input:focus,.login-card input:focus{outline:2px solid var(--terracotta); outline-offset:-1px; background:#fff}
-  .hint{font-size:11.5px; color:var(--ink-soft); margin-top:4px; min-height:15px}
+  .field input[aria-invalid="true"]{border-color:var(--critical); background:var(--critical-tint)}
+  .field-error{color:var(--critical); font-size:15px; font-weight:600; margin-top:5px}
+  .fecha-row{display:flex; gap:8px; flex-wrap:wrap}
+  .fecha-row input{flex:1 1 170px; min-width:0}
+  .hint{font-size:14px; color:var(--ink-soft); margin-top:4px; min-height:15px}
   details.clinico{margin-top:16px; border-top:1px dashed var(--line); padding-top:12px}
-  details.clinico summary{cursor:pointer; font-weight:600; color:var(--navy); font-size:14px}
+  details.clinico summary{cursor:pointer; font-weight:600; color:var(--navy); font-size:17px; padding:8px 0}
   details.clinico .grid{margin-top:12px}
   .form-actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; align-items:center}
+  .form-actions .hint{flex-basis:100%; margin:0}
   button.primary{background:var(--navy); color:#fff; border-color:var(--navy)}
   button.primary:hover{background:var(--navy-deep)}
   button.danger{color:var(--critical); border-color:var(--critical)}
-  .aviso{background:var(--good-tint); color:var(--good); font-weight:600; font-size:13px; padding:6px 12px; border-radius:8px}
+  button.danger:hover{background:var(--critical-tint)}
+  .aviso{display:flex; flex-wrap:wrap; align-items:center; gap:12px; width:100%; background:var(--good-tint); color:var(--good); border:1px solid var(--good); font-weight:700; font-size:18px; padding:12px 16px; border-radius:10px; margin-top:14px}
+  .aviso .aviso-texto{flex:1 1 240px}
+
+  /* Selector propio: lista de valores ya usados, tambien se puede escribir uno nuevo. */
+  .combo{position:relative}
+  .combo-lista{position:absolute; z-index:30; left:0; right:0; top:100%; margin:4px 0 0; padding:4px; list-style:none; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 12px 32px -8px rgba(17,34,43,.35); max-height:290px; overflow-y:auto}
+  .combo-lista li{display:flex; align-items:center; min-height:48px; padding:10px 14px; border-radius:8px; cursor:pointer; font-size:17px; line-height:1.3}
+  .combo-lista li:hover,.combo-lista li.activo{background:var(--navy-tint)}
+  .combo-lista li.nuevo{color:var(--terracotta); font-weight:700}
+
+  /* ---------- Edicion en ventana ---------- */
+  .edit-dialog{border:0; border-radius:14px; padding:0; width:min(980px,96vw); max-height:92vh; box-shadow:0 24px 60px -20px rgba(14,32,41,.6)}
+  .edit-dialog::backdrop{background:rgba(14,32,41,.55)}
+  .edit-dialog .card{margin:0; border:0; box-shadow:none; border-radius:0}
+  .edit-dialog .form-actions button{min-width:160px}
+  .edit-eliminar{margin-top:24px; padding-top:16px; border-top:1px dashed var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+  .edit-eliminar span{color:var(--ink-soft); font-size:15px}
+  @media (max-width:760px){
+    .edit-dialog{width:100vw; max-width:100vw; height:100dvh; max-height:100dvh; margin:0; border-radius:0}
+    .edit-dialog .form-actions button{flex:1 1 auto}
+  }
 
   /* ---------- Lista de pacientes ---------- */
-  .prow{display:grid; grid-template-columns:88px 1fr 150px 50px 110px 170px; gap:10px; align-items:center; padding:11px 16px; border-bottom:1px solid var(--line-soft); cursor:pointer}
+  .mesnav{display:flex; align-items:center; gap:6px}
+  .mesnav .flecha{font-size:24px; min-width:48px; padding:0 14px; line-height:1}
+  .mesnav .mes-actual{min-width:200px; font-size:18px; font-weight:700; color:var(--navy); text-align:center}
+  .lista-nota{font-size:14.5px; color:var(--ink-soft); margin:-6px 0 10px}
+  .prow{display:grid; grid-template-columns:92px 1.3fr 150px 50px 120px 1.2fr auto; gap:10px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line-soft); cursor:pointer}
   .prow:hover{background:var(--navy-tint)}
   .prow:last-child{border-bottom:0}
-  .prow .fecha{color:var(--ink-soft); font-size:13px}
-  .prow .pac b{display:block; font-weight:600; color:var(--ink)}
-  .prow .pac span{display:block; font-size:12px; color:var(--ink-soft)}
-  .prow .emp{font-size:12.5px; color:var(--ink-soft)}
+  .prow .fecha{color:var(--ink-soft); font-size:15px}
+  .prow .pac b{display:block; font-weight:700; font-size:18px; color:var(--ink); line-height:1.3}
+  .prow .pac span{display:block; font-size:14px; color:var(--ink-soft)}
+  .prow .emp{font-size:14.5px; color:var(--ink-soft)}
   .prow .num{text-align:right}
-  .prow-head{cursor:default; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); border-bottom:1px solid var(--line)}
+  .prow .valor .pendiente-valor{color:var(--ink-soft); font-style:italic; font-family:"Roboto",system-ui,sans-serif}
+  .prow .estado-detalle{display:block; font-size:14px; color:var(--ink-soft); margin-top:3px}
+  .prow .acciones .btn{padding:8px 14px; min-height:44px}
+  .prow-head{cursor:default; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); border-bottom:1px solid var(--line)}
   .prow-head:hover{background:transparent}
   .pill.pagado{background:var(--good-tint); color:var(--good)}
   .pill.enrelacion{background:var(--terracotta-tint); color:var(--terracotta)}
   .pill.sinrelacion{background:var(--critical-tint); color:var(--critical)}
   .pill.reciente{background:var(--navy-tint); color:var(--navy)}
+  .pill.estado-pac{white-space:normal; font-size:14px}
   .empty-list{padding:24px; text-align:center; color:var(--ink-soft)}
-  .controls input[type=month]{font:inherit; color:var(--ink); background:var(--paper-raised); border:1px solid var(--line); border-radius:8px; padding:7px 10px}
 
   @media (max-width:760px){
     .wrap{padding:0 16px 48px} .masthead{padding:24px 16px 20px}
     .grid{grid-template-columns:1fr 1fr} .grid .span2{grid-column:1/-1}
+    .mesnav{width:100%} .mesnav .mes-actual{flex:1; min-width:0}
+    .controls select{flex:1 1 100%; width:100%}
     .prow{grid-template-columns:1fr auto; gap:4px 10px}
     .prow-head{display:none}
     .prow .fecha{grid-column:1; grid-row:1}
-    .prow .pac{grid-column:1/-1; grid-row:2}
-    .prow .emp,.prow .num:nth-of-type(4){display:none}
-    .prow>div:last-child{grid-column:2; grid-row:1; justify-self:end}
-    .prow .num:nth-of-type(5){grid-column:1/-1; grid-row:3; text-align:left; font-size:12.5px; color:var(--ink-soft)}
+    .prow .acciones{grid-column:2; grid-row:1/3; align-self:start}
+    .prow .pac{grid-column:1; grid-row:2}
+    .prow .emp,.prow .uvr{display:none}
+    .prow .estado{grid-column:1/-1; grid-row:3}
+    .prow .valor{grid-column:1/-1; grid-row:4; text-align:left; font-size:14.5px; color:var(--ink-soft)}
   }
 
   .loading{display:inline-block; width:13px; height:13px; border:2px solid var(--navy); border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px}
@@ -196,6 +236,15 @@
     <button class="btn primary" type="submit">Entrar</button>
     <div class="login-error" id="loginError"></div>
   </form>
+</section>
+
+<section class="login" id="errorCarga" hidden>
+  <div class="login-card">
+    <h1>No se pudieron cargar los datos</h1>
+    <p>Revisa la conexión a internet e intenta de nuevo.</p>
+    <div class="login-error" id="errorCargaDetalle"></div>
+    <button class="btn primary" type="button" id="reintentarBtn">Reintentar</button>
+  </div>
 </section>
 
 <div id="app" hidden>
@@ -223,66 +272,49 @@
 
 <div class="wrap">
 <section data-vista="pacientes">
-  <form class="card" id="pacForm" autocomplete="off">
-    <h2 id="pacFormTitulo">Nuevo paciente</h2>
-    <div class="grid">
-      <div class="field"><label for="f_fecha">Fecha</label><input id="f_fecha" name="fecha" type="date" required></div>
-      <div class="field"><label for="f_institucion">Institución</label><input id="f_institucion" name="institucion" list="dl_institucion" autocapitalize="characters"></div>
-      <div class="field span2"><label for="f_cirujano">Cirujano</label><input id="f_cirujano" name="cirujano" list="dl_cirujano" autocapitalize="characters"></div>
-      <div class="field span2"><label for="f_nombre">Nombre</label><input id="f_nombre" name="nombre" required autocapitalize="characters"></div>
-      <div class="field span2"><label for="f_apellidos">Apellidos</label><input id="f_apellidos" name="apellidos" autocapitalize="characters"></div>
-      <div class="field"><label for="f_edad">Edad</label><input id="f_edad" name="edad" type="number" inputmode="numeric" min="0" max="120"></div>
-      <div class="field"><label for="f_empresa">Aseguradora</label><input id="f_empresa" name="empresa" list="dl_empresa" autocapitalize="characters"></div>
-      <div class="field span2"><label for="f_procedimiento">Procedimiento</label><input id="f_procedimiento" name="procedimiento" list="dl_procedimiento" autocapitalize="characters"></div>
-      <div class="field"><label for="f_uvr">UVR</label><input id="f_uvr" name="uvr" type="number" inputmode="decimal" step="0.5" min="0"></div>
-      <div class="field"><label for="f_valor">Valor ($)</label><input id="f_valor" name="valor" type="number" inputmode="numeric" min="0"></div>
-      <div class="field span2"><label>&nbsp;</label><div class="hint" id="valorHint"></div></div>
-    </div>
-    <details class="clinico">
-      <summary>Datos clínicos (ASA, técnica, medicamentos…)</summary>
-      <div class="grid">
-        <div class="field"><label for="f_asa">ASA</label><input id="f_asa" name="asa" list="dl_asa" autocapitalize="characters"></div>
-        <div class="field"><label for="f_duracion">Duración</label><input id="f_duracion" name="duracion" list="dl_duracion" autocapitalize="characters"></div>
-        <div class="field span2"><label for="f_comorbilidad">Comorbilidad</label><input id="f_comorbilidad" name="comorbilidad" list="dl_comorbilidad" autocapitalize="characters"></div>
-        <div class="field"><label for="f_tecnica">Técnica</label><input id="f_tecnica" name="tecnica" list="dl_tecnica" autocapitalize="characters"></div>
-        <div class="field span2"><label for="f_medicamentos">Medicamentos</label><input id="f_medicamentos" name="medicamentos" list="dl_medicamentos" autocapitalize="characters"></div>
-        <div class="field"><label for="f_via_aerea">Vía aérea</label><input id="f_via_aerea" name="via_aerea" list="dl_via_aerea" autocapitalize="characters"></div>
-        <div class="field"><label for="f_relajante">Relajante</label><input id="f_relajante" name="relajante" list="dl_relajante" autocapitalize="characters"></div>
-        <div class="field span2"><label for="f_bloqueo">Bloqueo</label><input id="f_bloqueo" name="bloqueo" list="dl_bloqueo" autocapitalize="characters"></div>
-        <div class="field"><label for="f_metodo">Método</label><input id="f_metodo" name="metodo" list="dl_metodo" autocapitalize="characters"></div>
-        <div class="field"><label for="f_anestesico">Anestésico</label><input id="f_anestesico" name="anestesico" list="dl_anestesico" autocapitalize="characters"></div>
-      </div>
-    </details>
+  <form class="card" id="pacForm" autocomplete="off" novalidate>
+    <h2>Nuevo paciente</h2>
+    <!-- Los campos se generan desde pacientes.js (los mismos que en la ventana de edicion). -->
+    <div class="campos"></div>
     <div class="form-actions">
       <button class="btn primary" type="submit" id="pacGuardar">Guardar paciente</button>
-      <button class="btn" type="button" id="pacRepetir" title="Copia fecha, cirujano, procedimiento y datos de anestesia del último paciente">Repetir anterior</button>
-      <button class="btn" type="button" id="pacCancelar" hidden>Cancelar</button>
-      <button class="btn danger" type="button" id="pacEliminar" hidden>Eliminar</button>
-      <span class="aviso" id="pacAviso" hidden></span>
+      <button class="btn" type="button" id="pacRepetir">Copiar datos del paciente anterior</button>
+      <div class="hint">Copia fecha, institución, cirujano, procedimiento y datos de anestesia del último paciente guardado. No copia nombre ni aseguradora.</div>
     </div>
-    <datalist id="dl_institucion"></datalist><datalist id="dl_empresa"></datalist><datalist id="dl_procedimiento"></datalist>
-    <datalist id="dl_cirujano"></datalist><datalist id="dl_asa"></datalist><datalist id="dl_comorbilidad"></datalist>
-    <datalist id="dl_duracion"></datalist><datalist id="dl_tecnica"></datalist><datalist id="dl_medicamentos"></datalist>
-    <datalist id="dl_via_aerea"></datalist><datalist id="dl_relajante"></datalist><datalist id="dl_bloqueo"></datalist>
-    <datalist id="dl_metodo"></datalist><datalist id="dl_anestesico"></datalist>
+    <div class="aviso" id="pacAviso" role="status" hidden>
+      <span class="aviso-texto" id="pacAvisoTexto"></span>
+      <button class="btn" type="button" id="pacCorregir" hidden>Corregir</button>
+    </div>
   </form>
 
   <div class="controls">
-    <input type="month" id="pacMes" title="Borra el mes para ver todos">
+    <div class="mesnav">
+      <button class="btn flecha" type="button" id="pacMesAnt" aria-label="Mes anterior">‹</button>
+      <span class="mes-actual" id="pacMesLabel" aria-live="polite"></span>
+      <button class="btn flecha" type="button" id="pacMesSig" aria-label="Mes siguiente">›</button>
+      <button class="btn" type="button" id="pacVerTodos">Ver todos</button>
+    </div>
     <div class="search"><input id="pacQ" type="text" placeholder="Buscar paciente, aseguradora, cirujano…"></div>
-    <select id="pacEstado">
+    <select id="pacEstado" aria-label="Filtrar por estado">
       <option value="">Todos los estados</option>
       <option value="pagado">Pagado</option>
-      <option value="enrelacion">En relación, sin pagar</option>
-      <option value="sinrelacion">No aparece en relación</option>
-      <option value="reciente">Pendiente de relación</option>
+      <option value="enrelacion">Reportado por la clínica, falta pago</option>
+      <option value="reciente">Esperando reporte de la clínica</option>
+      <option value="sinrelacion">La clínica no lo ha reportado (más de 45 días)</option>
     </select>
     <button class="btn" type="button" id="pacExport">Descargar Excel</button>
     <button class="btn" type="button" id="pacImport">Importar Excel</button>
     <input type="file" id="pacImportFile" accept=".xlsx,.xls" hidden>
   </div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--good)"></span>Pagado: la clínica ya pagó este paciente</span>
+    <span><span class="dot" style="background:var(--terracotta)"></span>Reportado: está en la relación de la clínica, falta el pago</span>
+    <span><span class="dot" style="background:var(--navy)"></span>Esperando: aún no llega la relación (menos de 45 días)</span>
+    <span><span class="dot" style="background:var(--critical)"></span>No reportado: pasaron más de 45 días sin relación</span>
+  </div>
+  <div class="lista-nota" id="pacListaNota" hidden>Se busca en todos los meses.</div>
   <div class="table-card">
-    <div class="prow prow-head"><div>Fecha</div><div>Paciente</div><div>Aseguradora</div><div class="num">UVR</div><div class="num">Valor</div><div>Estado</div></div>
+    <div class="prow prow-head"><div>Fecha</div><div>Paciente</div><div>Aseguradora</div><div class="num">UVR</div><div class="num">Valor</div><div>Estado</div><div></div></div>
     <div id="pacRows"></div>
   </div>
 
@@ -348,9 +380,25 @@
   </div>
 </section>
 </div>
+
+<!-- Edicion de un paciente ya guardado: misma ficha, en una ventana encima de la lista. -->
+<dialog class="edit-dialog" id="editDialog" aria-labelledby="editTitulo">
+  <form class="card" id="editForm" autocomplete="off" novalidate>
+    <h2 id="editTitulo">Corregir paciente</h2>
+    <div class="campos"></div>
+    <div class="form-actions">
+      <button class="btn primary" type="submit" id="editGuardar">Guardar cambios</button>
+      <button class="btn" type="button" id="editCancelar">Cancelar</button>
+    </div>
+    <div class="edit-eliminar">
+      <button class="btn danger" type="button" id="editEliminar">Eliminar paciente</button>
+      <span>Se pide confirmación antes de borrar.</span>
+    </div>
+  </form>
+</dialog>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script src="pacientes.js"></script>
 <script src="app.js"></script>
 </body>
