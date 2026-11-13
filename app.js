@@ -354,19 +354,62 @@ const estadoLabel = { pagada: 'Pagada', pendiente: 'Pendiente', sinabonos: 'Sin 
 
 let ULTIMO_CALC = null;
 
+// ===================== FILTRO POR PERIODO (fecha de emision) =====================
+function periodoFactura(f) {
+  const d = f.fecha ? new Date(f.fecha) : null;
+  return d && !isNaN(d) ? { anio: d.getFullYear(), mes: d.getMonth() + 1 } : null;
+}
+
+function llenarAnios() {
+  const sel = document.getElementById('carteraAnio');
+  const elegido = sel.value;
+  const anios = [...new Set([...FACTURAS.values()].map(periodoFactura).filter(Boolean).map(p => p.anio))].sort((a, b) => b - a);
+  sel.innerHTML = '<option value="">Todos los años</option>' + anios.map(a => `<option value="${a}">${a}</option>`).join('');
+  sel.value = anios.includes(Number(elegido)) ? elegido : '';
+  document.getElementById('carteraMes').disabled = !sel.value;
+}
+
+function facturasEntreMeses(resumen, anio, desde, hasta) {
+  return resumen.filter(r => {
+    const p = periodoFactura(r);
+    return p && p.anio === anio && p.mes >= desde && p.mes <= hasta;
+  });
+}
+
+// Facturas del periodo elegido y, si hay un mes, el acumulado del año de enero a ese mes.
+function filtrarPorPeriodo(resumen) {
+  const anio = Number(document.getElementById('carteraAnio').value) || null;
+  const mes = anio ? Number(document.getElementById('carteraMes').value) || null : null;
+  if (!anio) return { anio, mes, filtradas: resumen, acumulado: null };
+  return {
+    anio, mes,
+    filtradas: facturasEntreMeses(resumen, anio, mes || 1, mes || 12),
+    acumulado: mes ? facturasEntreMeses(resumen, anio, 1, mes) : null,
+  };
+}
+
+function textoAcumulado(anio, mes) {
+  const rango = mes === 1 ? 'enero' : `ene–${NOMBRES_MES[mes - 1].slice(0, 3)}`;
+  return `Acumulado ${rango} ${anio}`;
+}
+
+const sumaCampo = (lista, campo) => lista.reduce((s, r) => s + r[campo], 0);
+
 async function render() {
   const { resumen, inconsistencias } = calcularConciliacion();
   ULTIMO_CALC = { resumen, inconsistencias };
 
-  const totFacturado = resumen.reduce((s, r) => s + r.total, 0);
-  const totRetencion = resumen.reduce((s, r) => s + r.retencion, 0);
-  const totAbonado = resumen.reduce((s, r) => s + r.sumaAbonos, 0);
-  const totSaldo = resumen.reduce((s, r) => s + r.saldo, 0);
-  document.getElementById('tiles').innerHTML = `
-    <div class="tile"><div class="label">Total facturado</div><div class="value">${copShort(totFacturado)}</div></div>
-    <div class="tile"><div class="label">Retención en la fuente</div><div class="value">${copShort(totRetencion)}</div></div>
-    <div class="tile"><div class="label">Total abonado</div><div class="value">${copShort(totAbonado)}</div></div>
-    <div class="tile flag"><div class="label">Saldo pendiente</div><div class="value">${copShort(totSaldo)}</div></div>`;
+  llenarAnios();
+  const { anio, mes, filtradas, acumulado } = filtrarPorPeriodo(resumen);
+  const periodo = anio ? ` · ${mes ? NOMBRES_MES[mes - 1] + ' ' : ''}${anio}` : '';
+  const tile = (label, campo, clase = '') => `
+    <div class="tile ${clase}"><div class="label">${label}${periodo}</div>
+      <div class="value">${copShort(sumaCampo(filtradas, campo))}</div>
+      ${acumulado ? `<div class="acum">${textoAcumulado(anio, mes)}: ${cop(sumaCampo(acumulado, campo))}</div>` : ''}
+    </div>`;
+  document.getElementById('tiles').innerHTML =
+    tile('Facturado', 'total') + tile('Retención en la fuente', 'retencion') +
+    tile('Abonado', 'sumaAbonos') + tile('Saldo pendiente', 'saldo', 'flag');
 
   const facturasConIssue = new Set();
   inconsistencias.forEach(i => { const m = i.match(/JMA\d+/); if (m) facturasConIssue.add(m[0]); });
@@ -376,11 +419,12 @@ async function render() {
   const rowsEl = document.getElementById('rows');
   rowsEl.innerHTML = '';
 
-  if (!resumen.length) {
-    rowsEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink-soft)">Todavía no has subido ninguna factura.</div>';
+  if (!filtradas.length) {
+    const vacio = resumen.length ? 'No hay facturas emitidas en este periodo.' : 'Todavía no has subido ninguna factura.';
+    rowsEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--ink-soft)">${vacio}</div>`;
   }
 
-  resumen.forEach(r => {
+  filtradas.forEach(r => {
     const st = estado(r, facturasConIssue);
     if (statusFilter && st !== statusFilter) return;
     if (q && !r.factura.toLowerCase().includes(q)) return;
@@ -428,25 +472,26 @@ function renderDetalle(list) {
 // ===================== EXCEL =====================
 function exportarExcel() {
   if (!ULTIMO_CALC) return;
-  const { resumen, inconsistencias } = ULTIMO_CALC;
+  const { inconsistencias } = ULTIMO_CALC;
+  const { anio, mes, filtradas, acumulado } = filtrarPorPeriodo(ULTIMO_CALC.resumen);
   const wb = XLSX.utils.book_new();
 
-  const resumenRows = resumen.map(r => ({
+  const filaTotal = (etiqueta, lista) => ({
+    Factura: etiqueta, 'Fecha Emisión': '',
+    'Total Facturado': sumaCampo(lista, 'total'), 'Retención': sumaCampo(lista, 'retencion'),
+    '# Abonos': '', 'Suma Abonos': sumaCampo(lista, 'sumaAbonos'), 'Saldo Pendiente': sumaCampo(lista, 'saldo'),
+  });
+  const resumenRows = filtradas.map(r => ({
     Factura: r.factura, 'Fecha Emisión': r.fecha ? new Date(r.fecha).toLocaleDateString('es-CO') : '',
     'Total Facturado': r.total, 'Retención': r.retencion, '# Abonos': r.numAbonos,
     'Suma Abonos': r.sumaAbonos, 'Saldo Pendiente': r.saldo,
   }));
-  resumenRows.push({
-    Factura: 'TOTAL', 'Fecha Emisión': '',
-    'Total Facturado': resumen.reduce((s, r) => s + r.total, 0),
-    'Retención': resumen.reduce((s, r) => s + r.retencion, 0),
-    '# Abonos': '', 'Suma Abonos': resumen.reduce((s, r) => s + r.sumaAbonos, 0),
-    'Saldo Pendiente': resumen.reduce((s, r) => s + r.saldo, 0),
-  });
+  resumenRows.push(filaTotal('TOTAL', filtradas));
+  if (acumulado) resumenRows.push(filaTotal(textoAcumulado(anio, mes).toUpperCase(), acumulado));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenRows), 'Resumen');
 
   const detalleRows = [];
-  resumen.forEach(r => r.abonosDetalle.forEach(a => detalleRows.push({
+  filtradas.forEach(r => r.abonosDetalle.forEach(a => detalleRows.push({
     Factura: r.factura, 'Fecha Abono': a.fecha ? new Date(a.fecha).toLocaleDateString('es-CO') : '',
     'Valor Abono': a.abono, 'Retención (del recibo)': a.retencion, 'Forma de Pago': a.formaPago, Archivo: a.archivo,
   })));
@@ -454,8 +499,8 @@ function exportarExcel() {
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(inconsistencias.map(d => ({ Detalle: d }))), 'Inconsistencias');
 
-  const fecha = hoyISO();
-  XLSX.writeFile(wb, `Conciliacion Facturas ${fecha}.xlsx`);
+  const periodo = anio ? `${anio}${mes ? '-' + String(mes).padStart(2, '0') : ''} ` : '';
+  XLSX.writeFile(wb, `Conciliacion Facturas ${periodo}${hoyISO()}.xlsx`);
 }
 
 // ===================== EVENTOS =====================
@@ -487,6 +532,11 @@ async function handleFiles(fileList) {
 
 document.getElementById('q').addEventListener('input', render);
 document.getElementById('statusFilter').addEventListener('change', render);
+document.getElementById('carteraAnio').addEventListener('change', () => {
+  document.getElementById('carteraMes').value = '';
+  render();
+});
+document.getElementById('carteraMes').addEventListener('change', render);
 document.getElementById('exportBtn').addEventListener('click', exportarExcel);
 
 // ===================== PESTAÑAS =====================

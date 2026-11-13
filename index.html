@@ -42,6 +42,8 @@
   .tile .label{font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:#a3c3d6}
   .tile .value{font-family:"Raleway",serif; font-size:26px; font-weight:700; color:#fbfdff; margin-top:5px}
   .tile.flag .value{color:#f0b57e}
+  .tile .acum{font-size:12.5px; color:#a3c3d6; margin-top:4px}
+  .nota-periodo{margin:-6px 0 14px; font-size:14px; color:var(--ink-soft)}
 
   .dropzone{
     margin:26px 0 0; border:2px dashed var(--line); border-radius:12px; background:var(--paper-raised);
@@ -341,6 +343,16 @@
   <div class="log" id="log"></div>
 
   <div class="controls">
+    <select id="carteraAnio" aria-label="Año de emisión">
+      <option value="">Todos los años</option>
+    </select>
+    <select id="carteraMes" aria-label="Mes de emisión" disabled>
+      <option value="">Todo el año</option>
+      <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+      <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+      <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+      <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+    </select>
     <div class="search">
       <input id="q" type="text" placeholder="Buscar por número de factura…">
     </div>
@@ -353,6 +365,7 @@
     </select>
     <button class="btn" id="exportBtn">Descargar Excel</button>
   </div>
+  <p class="nota-periodo">El año y el mes son los de emisión de la factura. Abonado y saldo son los de las facturas emitidas en el periodo, sin importar cuándo se pagaron.</p>
   <div class="legend">
     <span><span class="dot" style="background:var(--good)"></span>Pagada</span>
     <span><span class="dot" style="background:var(--terracotta)"></span>Pendiente</span>
