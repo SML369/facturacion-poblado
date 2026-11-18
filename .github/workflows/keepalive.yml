@@ -1,10 +1,12 @@
 name: Keep-alive Supabase
 
 # Supabase pausa los proyectos gratuitos tras unos dias sin uso.
-# Este ping diario lo evita aunque nadie abra la app.
+# Este ping lo evita aunque nadie abra la app: lee fp_ping y escribe un
+# latido en fp_latidos (solo leer no fue suficiente para Supabase).
 on:
   schedule:
     - cron: '17 11 * * *'   # 6:17 a.m. hora Colombia
+    - cron: '17 23 * * *'   # 6:17 p.m. hora Colombia
   workflow_dispatch:
 
 permissions:
@@ -17,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Consultar fp_ping
+      - name: Consultar fp_ping y registrar latido
         run: |
           # La llave anon es publica y ya va en app.js; se lee de ahi para no duplicarla.
           URL=$(sed -n "s/^const SUPA_URL *= *'\([^']*\)'.*/\1/p" app.js)
@@ -25,6 +27,13 @@ jobs:
           curl --fail --silent --show-error --max-time 30 --retry 3 --retry-delay 20 \
             "$URL/rest/v1/fp_ping?select=id" \
             -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+          echo
+          echo "Latidos guardados:"
+          curl --fail --silent --show-error --max-time 30 --retry 3 --retry-delay 20 \
+            -X POST "$URL/rest/v1/rpc/fp_latido" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"p_origen":"github"}'
 
       - name: Mantener activo el cron
         # GitHub desactiva los cron de un repo sin actividad en 60 dias;
